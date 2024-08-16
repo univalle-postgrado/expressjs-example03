@@ -17,7 +17,37 @@ const db = new Client({
 db.connect();
 
 const validateMovie = [
-  body('title').notEmpty().withMessage('El título es requerido'),
+  body('title')
+    .notEmpty()
+    .withMessage('El título es requerido')
+    .custom(async (value, { req }) => {
+      let id = req.params.id;
+      if (!id) id = 0;
+      const { rows } = await db.query(
+        'SELECT * FROM movies WHERE title = $1 AND id != $2',
+        [value, id]
+      );
+      if (rows.length > 0) {
+        throw new Error('El título ya existe para otra película');
+      }
+      return true;
+    })
+];
+
+const validateMoviePatch = [
+  body('title')
+    .custom(async (value, { req }) => {
+      let id = req.params.id;
+      if (!id) id = 0;
+      const { rows } = await db.query(
+        'SELECT * FROM movies WHERE title = $1 AND id != $2',
+        [value, id]
+      );
+      if (rows.length > 0) {
+        throw new Error('El título ya existe para otra película');
+      }
+      return true;
+    })
 ];
 
 app.get('/', (req, res) => {
@@ -76,14 +106,14 @@ app.put('/movies/:id', validateMovie, async (req, res) => {
   }
 
   try {
-    const id = intval(req.params.id);
+    const id = parseInt(req.params.id);
     const { title, year } = req.body;
     const { rowCount } = await db.query(`SELECT * FROM movies WHERE id=${id}`);
     if (rowCount > 0) {
       const { rows } = await db.query(`UPDATE movies SET title = '${title}', year = '${year}' WHERE id = '${id}' RETURNING *`);
       res.json(rows[0]);
     } else {
-      const { rows } = await db.query('INSERT INTO movies (title, year) VALUES ($1, $2) RETURNING *', [title, year]);
+      const { rows } = await db.query('INSERT INTO movies (id, title, year) VALUES ($1, $2, $3) RETURNING *', [id, title, year]);
       res.status(201).json(rows[0]);
     }
   } catch (err) {
@@ -94,9 +124,15 @@ app.put('/movies/:id', validateMovie, async (req, res) => {
     });
   }
 });
-app.patch('/movies/:id', async (req, res) => {
-  const id = intval(req.params.id);
+app.patch('/movies/:id', validateMoviePatch, async (req, res) => {
+  const errors = validationResult(req, res);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ error: errors.array() });
+  }
+  
   try {
+    const id = parseInt(req.params.id);
+
     const { rowCount } = await db.query(`SELECT * FROM movies WHERE id=${id}`);
     if (rowCount == 0) {
       return res.status(404).json({ message: 'Película no encontrada' });
@@ -139,7 +175,7 @@ app.patch('/movies/:id', async (req, res) => {
 });
 app.delete('/movies/:id', async (req, res) => {
   try {
-    const id = intval(req.params.id);
+    const id = parseInt(req.params.id);
     const { rowCount } = await db.query(`SELECT * FROM movies WHERE id=${id}`);
     if (rowCount == 0) {
       return res.status(404).json({ message: 'Película no encontrada' });

@@ -1,5 +1,6 @@
 CREATE TABLE movies (
     id serial PRIMARY KEY,
     title character varying(150) NOT NULL,
-    year integer
+    year integer,
+    UNIQUE(title)
 );
