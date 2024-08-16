@@ -25,15 +25,31 @@ app.get('/', (req, res) => {
 });
 
 app.get('/movies', async (req, res) => {
-  const { rows } = await db.query("SELECT * FROM movies");
-  res.json(rows);
+  try {
+    const { rows } = await db.query("SELECT * FROM movies");
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({
+      code: 1001,
+      message: 'Error al modificar la película',
+      error_message: err.message
+    });
+  }
 });
 app.get('/movies/:id', async (req, res) => {
-  const { rows, rowCount } = await db.query("SELECT * FROM movies WHERE id=" + req.params.id);
-  if (rowCount > 0) {
-    res.json(rows[0]);
-  } else {
-    res.status(404).json({ message: 'Película no encontrada' });
+  try {
+    const { rows, rowCount } = await db.query("SELECT * FROM movies WHERE id=" + req.params.id);
+    if (rowCount > 0) {
+      res.json(rows[0]);
+    } else {
+      res.status(404).json({ message: 'Película no encontrada' });
+    }
+  } catch (err) {
+    res.status(500).json({
+      code: 1002,
+      message: 'Error al modificar la película',
+      error_message: err.message
+    });
   }
 });
 app.post('/movies', validateMovie, async (req, res) => {
@@ -42,8 +58,16 @@ app.post('/movies', validateMovie, async (req, res) => {
     return res.status(400).json({ error: errors.array() });
   }
 
-  const { rows } = await db.query('INSERT INTO movies (title, year) VALUES ($1, $2) RETURNING *', [req.body.title, req.body.year]);
-  res.status(201).json(rows[0]);
+  try {
+    const { rows } = await db.query('INSERT INTO movies (title, year) VALUES ($1, $2) RETURNING *', [req.body.title, req.body.year]);
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    res.status(500).json({
+      code: 1003,
+      message: 'Error al modificar la película',
+      error_message: err.message
+    });
+  }
 });
 app.put('/movies/:id', validateMovie, async (req, res) => {
   const errors = validationResult(req, res);
@@ -51,22 +75,33 @@ app.put('/movies/:id', validateMovie, async (req, res) => {
     return res.status(400).json({ error: errors.array() });
   }
 
-  const { title, year } = req.body;
-  const { rowCount } = await db.query(`SELECT * FROM movies WHERE id=${req.params.id}`);
-  if (rowCount > 0) {
-    const { rows } = await db.query(`UPDATE movies SET title = '${title}', year = '${year}' WHERE id = '${req.params.id}' RETURNING *`);
-    res.json(rows[0]);
-  } else {
-    const { rows } = await db.query('INSERT INTO movies (title, year) VALUES ($1, $2) RETURNING *', [req.body.title, req.body.year]);
-    res.status(201).json(rows[0]);
+  try {
+    const id = intval(req.params.id);
+    const { title, year } = req.body;
+    const { rowCount } = await db.query(`SELECT * FROM movies WHERE id=${id}`);
+    if (rowCount > 0) {
+      const { rows } = await db.query(`UPDATE movies SET title = '${title}', year = '${year}' WHERE id = '${id}' RETURNING *`);
+      res.json(rows[0]);
+    } else {
+      const { rows } = await db.query('INSERT INTO movies (title, year) VALUES ($1, $2) RETURNING *', [title, year]);
+      res.status(201).json(rows[0]);
+    }
+  } catch (err) {
+    res.status(500).json({
+      code: 1004,
+      message: 'Error al modificar la película',
+      error_message: err.message
+    });
   }
 });
 app.patch('/movies/:id', async (req, res) => {
-  const id = req.params.id;
-  const { rowCount } = await db.query(`SELECT * FROM movies WHERE id=${id}`);
-  if (rowCount == 0) {
-    res.status(404).json({ message: 'Película no encontrada' });
-  } else {
+  const id = intval(req.params.id);
+  try {
+    const { rowCount } = await db.query(`SELECT * FROM movies WHERE id=${id}`);
+    if (rowCount == 0) {
+      return res.status(404).json({ message: 'Película no encontrada' });
+    }
+
     const { title, year } = req.body;
     let updateQuery = 'UPDATE movies SET ';
     let updateValues = [];
@@ -94,16 +129,29 @@ app.patch('/movies/:id', async (req, res) => {
     } else {
       res.status(404).json({ message: 'No se pudo actualizar la película' })
     }
+  } catch (err) {
+    res.status(500).json({
+      code: 1005,
+      message: 'Error al modificar la película',
+      error_message: err.message
+    });
   }
 });
 app.delete('/movies/:id', async (req, res) => {
-  const id = req.params.id;
-  const { rowCount } = await db.query(`SELECT * FROM movies WHERE id=${id}`);
-  if (rowCount == 0) {
-    res.status(404).json({ message: 'Película no encontrada' });
-  } else {
+  try {
+    const id = intval(req.params.id);
+    const { rowCount } = await db.query(`SELECT * FROM movies WHERE id=${id}`);
+    if (rowCount == 0) {
+      return res.status(404).json({ message: 'Película no encontrada' });
+    }
     await db.query('DELETE FROM movies WHERE id = $1', [id]);
     res.sendStatus(204);
+  } catch (err) {
+    res.status(500).json({
+      code: 1006,
+      message: 'Error al eliminar la película',
+      error_message: err.message
+    });
   }
 });
 
